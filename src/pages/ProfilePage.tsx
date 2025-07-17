@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, Camera, Heart, Package, Settings, LogOut } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, Camera, Heart, Package, Settings, LogOut, Eye, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import toast from 'react-hot-toast';
@@ -26,6 +26,7 @@ const ProfilePage = () => {
   });
   const [orders, setOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   // Update form data when profile loads
   React.useEffect(() => {
@@ -50,21 +51,25 @@ const ProfilePage = () => {
     const fetchOrders = async () => {
       if (!user) return;
       setOrdersLoading(true);
+      setOrdersError(null);
       try {
         const { data, error } = await supabase
           .from('orders')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
+        
         if (error) throw error;
         setOrders(data || []);
       } catch (err) {
-        toast.error('Failed to fetch orders');
+        console.error('Error fetching orders:', err);
+        setOrdersError(err instanceof Error ? err.message : 'Failed to fetch orders');
       } finally {
         setOrdersLoading(false);
       }
     };
-    if (activeTab === 'orders' && user) {
+    
+    if (activeTab === 'orders') {
       fetchOrders();
     }
   }, [activeTab, user]);
@@ -449,6 +454,20 @@ const ProfilePage = () => {
                       <div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                       <p className="text-gray-600 font-inter">Loading your orders...</p>
                     </div>
+                  ) : ordersError ? (
+                    <div className="text-center py-12">
+                      <Package className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-playfair font-semibold text-gray-800 mb-2">
+                        Error Loading Orders
+                      </h3>
+                      <p className="text-red-600 font-inter mb-4">{ordersError}</p>
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="px-6 py-3 bg-primary-600 text-white rounded-xl font-inter font-medium hover:bg-primary-700 transition-colors duration-200"
+                      >
+                        Try Again
+                      </button>
+                    </div>
                   ) : orders.length === 0 ? (
                     <div className="text-center py-12">
                       <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -458,46 +477,124 @@ const ProfilePage = () => {
                       <p className="text-gray-600 font-inter">
                         Your order history will appear here once you make your first purchase.
                       </p>
+                      <div className="mt-6">
+                        <a
+                          href="/products"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl font-inter font-medium hover:shadow-lg transition-all duration-300"
+                        >
+                          Start Shopping
+                          <ArrowRight size={18} />
+                        </a>
+                      </div>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead>
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
-                          {orders.map(order => (
-                            <tr key={order.id} className="hover:bg-gray-50 transition-colors duration-200">
-                              <td className="px-6 py-4 font-inter font-medium text-gray-800">#{order.id.slice(-8).toUpperCase()}</td>
-                              <td className="px-6 py-4 text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
-                              <td className="px-6 py-4 font-inter font-semibold text-gray-800">₹{order.total_amount.toFixed(2)}</td>
-                              <td className="px-6 py-4">
-                                <span className={`px-3 py-1 rounded-full text-sm font-inter font-medium ${
-                                  order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                  order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                                  order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
-                                  order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                  order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-gray-600">
-                                {Array.isArray(order.items) ? order.items.map((item: any, idx: number) => (
-                                  <span key={idx}>{item.name}{idx < order.items.length - 1 ? ', ' : ''}</span>
-                                )) : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="space-y-6">
+                      {orders.map((order, index) => (
+                        <motion.div
+                          key={order.id}
+                          className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.1 }}
+                        >
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4">
+                            <div className="flex items-center gap-4 mb-4 lg:mb-0">
+                              <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-sage-100 rounded-xl flex items-center justify-center">
+                                <Package className="w-6 h-6 text-primary-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-inter font-semibold text-gray-800">
+                                  Order #{order.id.slice(-8).toUpperCase()}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  {new Date(order.created_at).toLocaleDateString('en-IN', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="font-playfair font-bold text-lg text-gray-800">
+                                  ₹{order.total_amount.toFixed(2)}
+                                </p>
+                                {order.discount_amount > 0 && (
+                                  <p className="text-sm text-green-600">
+                                    Saved ₹{order.discount_amount.toFixed(2)}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              <span className={`px-3 py-1 rounded-full text-sm font-inter font-medium ${
+                                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                                order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Order Items */}
+                          <div className="border-t border-gray-100 pt-4">
+                            <h4 className="font-inter font-medium text-gray-800 mb-3">Items Ordered:</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {Array.isArray(order.items) && order.items.map((item: any, idx: number) => (
+                                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                  <img
+                                    src={item.image_url || "https://images.pexels.com/photos/7755515/pexels-photo-7755515.jpeg"}
+                                    alt={item.name}
+                                    className="w-12 h-12 object-cover rounded-lg"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-inter font-medium text-gray-800 text-sm truncate">
+                                      {item.name}
+                                    </p>
+                                    <p className="text-xs text-gray-600">
+                                      Qty: {item.quantity} × ₹{item.price}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Payment & Shipping Info */}
+                          <div className="border-t border-gray-100 pt-4 mt-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-600">Payment Method:</p>
+                                <p className="font-medium capitalize">
+                                  {order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method}
+                                </p>
+                              </div>
+                              {order.coupon_code && (
+                                <div>
+                                  <p className="text-gray-600">Coupon Applied:</p>
+                                  <p className="font-medium text-green-600">{order.coupon_code}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Action Button */}
+                          <div className="border-t border-gray-100 pt-4 mt-4">
+                            <a
+                              href={`/order-confirmation/${order.id}`}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-lg font-inter font-medium text-sm transition-colors duration-200"
+                            >
+                              <Eye size={16} />
+                              View Details
+                            </a>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
                   )}
                 </div>

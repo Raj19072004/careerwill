@@ -163,7 +163,7 @@ const Products = () => {
                   {/* Price */}
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-2xl font-playfair font-bold text-primary-600">
-                      ${product.price}
+                      ₹{product.price}
                     </span>
                     <span className="text-sm text-gray-500 font-inter capitalize">
                       {product.category?.replace('-', ' ')}

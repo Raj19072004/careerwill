@@ -184,7 +184,7 @@ const EditProductForm: React.FC<EditProductFormProps> = ({ productId, onClose })
 
             <div>
               <label className="block text-sm font-inter font-medium text-gray-700 mb-2">
-                Price ($)
+                Price (₹)
               </label>
               <input
                 {...register('price', { 

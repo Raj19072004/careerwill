@@ -43,7 +43,7 @@ const Register = () => {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success('Account created successfully! Please check your email to verify your account.');
+        toast.success('Account created successfully! Please check your email and click the verification link to activate your account.');
         navigate('/login');
       }
     } catch (err) {
