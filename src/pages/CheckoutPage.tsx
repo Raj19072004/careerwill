@@ -669,6 +669,13 @@ const CheckoutPage = () => {
               {/* Coupon Section */}
               <div className="mb-6 p-4 bg-gray-50 rounded-xl">
                 <h4 className="font-inter font-semibold text-gray-800 mb-3">Apply Coupon</h4>
+                {cartState.hasSpecialOffer && (
+                  <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800 font-inter">
+                      ⚠️ Coupons cannot be applied when special offer (₹999 for 3+ items) is active
+                    </p>
+                  </div>
+                )}
                 {cartState.appliedCoupon ? (
                   <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div>
@@ -682,7 +689,7 @@ const CheckoutPage = () => {
                       <X size={16} />
                     </button>
                   </div>
-                ) : (
+                ) : !cartState.hasSpecialOffer ? (
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -703,7 +710,7 @@ const CheckoutPage = () => {
                       )}
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-3 border-t border-gray-200 pt-4">
