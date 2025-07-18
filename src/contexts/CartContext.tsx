@@ -61,18 +61,39 @@ const calculateTotals = (state: CartState): CartState => {
   const total = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
   
-  // Special offer: Buy any 3+ products for ₹999 (only if total > ₹999)
+  // Special offer: First 3 products for ₹999, additional items at original price
   let discountAmount = 0;
   let hasSpecialOffer = false;
   let finalTotal = total;
   let couponDiscount = 0;
   
-  if (itemCount >= 3 && total > 999) {
-    discountAmount = total - 999;
-    hasSpecialOffer = true;
-    finalTotal = 999;
+  if (itemCount >= 3) {
+    // Calculate cost for first 3 items
+    let itemsProcessed = 0;
+    let firstThreeItemsCost = 0;
+    let additionalItemsCost = 0;
+    
+    for (const item of state.items) {
+      const remainingForOffer = Math.max(0, 3 - itemsProcessed);
+      const itemsInOffer = Math.min(item.quantity, remainingForOffer);
+      const additionalItems = item.quantity - itemsInOffer;
+      
+      firstThreeItemsCost += item.price * itemsInOffer;
+      additionalItemsCost += item.price * additionalItems;
+      itemsProcessed += item.quantity;
+    }
+    
+    // Apply special offer only if first 3 items cost more than ₹999
+    if (firstThreeItemsCost > 999) {
+      discountAmount = firstThreeItemsCost - 999;
+      finalTotal = 999 + additionalItemsCost;
+      hasSpecialOffer = true;
+    } else {
+      // If first 3 items cost ≤ ₹999, no special offer
+      finalTotal = total;
+    }
   } else {
-    // Only apply coupon if special offer is not active
+    // Less than 3 items, check for coupon
     if (state.appliedCoupon) {
       if (total >= state.appliedCoupon.min_order_amount) {
         if (state.appliedCoupon.discount_type === 'percentage') {
@@ -85,13 +106,25 @@ const calculateTotals = (state: CartState): CartState => {
     }
   }
   
+  // Only apply coupon if special offer is not active
+  if (!hasSpecialOffer && state.appliedCoupon) {
+    if (total >= state.appliedCoupon.min_order_amount) {
+      if (state.appliedCoupon.discount_type === 'percentage') {
+        couponDiscount = (total * state.appliedCoupon.discount_value) / 100;
+      } else {
+        couponDiscount = state.appliedCoupon.discount_value;
+      }
+      finalTotal = Math.max(0, total - couponDiscount);
+    }
+  }
+  
   return { 
     ...state, 
     total, 
     itemCount, 
     discountAmount,
     finalTotal,
-    hasSpecialOffer,
+    hasSpecialOffer = true;
     couponDiscount
   };
 };
@@ -258,17 +291,43 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Validate item data
     if (!item.id || !item.name || !item.price) {
-      console.error('Invalid item data:', item);
+      
+      // Calculate if this triggers the special offer
+      let triggersSpecialOffer = false;
+      if (newItemCount === 3) {
+        // Check if first 3 items would cost more than ₹999
+        let itemsProcessed = 0;
+        let firstThreeItemsCost = 0;
+        const tempItems = [...state.items];
+        
+        // Add the new item temporarily
+        const existingItem = tempItems.find(i => i.id === item.id);
+        if (existingItem) {
+          existingItem.quantity += 1;
+        } else {
+          tempItems.push({ ...item, quantity: 1 });
+        }
+        
+        for (const cartItem of tempItems) {
+          const remainingForOffer = Math.max(0, 3 - itemsProcessed);
+          const itemsInOffer = Math.min(cartItem.quantity, remainingForOffer);
+          firstThreeItemsCost += cartItem.price * itemsInOffer;
+          itemsProcessed += cartItem.quantity;
+          if (itemsProcessed >= 3) break;
+        }
+        
+        triggersSpecialOffer = firstThreeItemsCost > 999;
+      }
       toast.error('Invalid product data');
       return;
-    }
+      if (triggersSpecialOffer) {
 
     dispatch({ type: 'ADD_ITEM', payload: item });
     
     // Show special offer notification if applicable
     const newItemCount = state.itemCount + 1;
     const newTotal = state.total + item.price;
-    
+        toast.success(`🎉 Special Offer Applied! First 3 products for ₹999`, {
     // Remove any applied coupon when special offer becomes active
     if (newItemCount === 3 && newTotal > 999) {
       if (state.appliedCoupon) {

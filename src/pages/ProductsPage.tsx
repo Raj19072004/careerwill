@@ -202,7 +202,7 @@ const ProductsPage = () => {
               <div className="flex items-center gap-3">
                 <Sparkles className="w-6 h-6" />
                 <span className="text-xl font-playfair font-bold">
-                  Buy Any 3 Products for ₹999
+                  First 3 Products for ₹999
                 </span>
                 <Sparkles className="w-6 h-6" />
               </div>
@@ -496,7 +496,7 @@ const ProductsPage = () => {
                 Special Launch Offer
               </h3>
               <p className="text-2xl mb-8 font-inter">
-                Buy Any 3 Products for Just ₹999
+                First 3 Products for Just ₹999
               </p>
               <p className="text-lg mb-8 font-inter opacity-90">
                 Get notified when our products launch and receive exclusive early-bird offers

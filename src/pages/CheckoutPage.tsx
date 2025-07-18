@@ -544,8 +544,8 @@ const CheckoutPage = () => {
                   {paymentMethod === 'cod' && (
                     <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
                       <p className="text-sm font-inter text-yellow-800">
-                        You will pay ₹{cartState.finalTotal.toFixed(2)} in cash when your order is delivered.
-                        A small convenience fee may apply for Cash on Delivery orders.
+                      <p className="text-sm text-yellow-800 font-inter">
+                        ⚠️ Coupons cannot be applied when special offer (first 3 items for ₹999) is active
                       </p>
                     </div>
                   )}

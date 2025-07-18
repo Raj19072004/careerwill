@@ -151,9 +151,9 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                             <Gift className="w-6 h-6" />
                           </motion.div>
                           <div className="bg-white/20 rounded-lg p-3 backdrop-blur-sm">
-                            <p className="font-inter text-lg font-semibold">Buy Any 3+ Products for ₹999</p>
+                            <p className="font-inter text-lg font-semibold">First 3 Products for ₹999</p>
                             <p className="font-inter text-sm opacity-90 mt-1">
-                              You saved ₹{state.discountAmount.toFixed(2)}! 💰
+                              You saved ₹{state.discountAmount.toFixed(2)}! Additional items at regular price.
                             </p>
                           </div>
                         </div>
@@ -198,7 +198,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                         <div className="mt-3 text-center">
                           <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-xs font-inter font-medium">
                             <Tag size={12} />
-                            Get all products for just ₹999
+                            Get first 3 products for just ₹999
                           </span>
                         </div>
                       </motion.div>
