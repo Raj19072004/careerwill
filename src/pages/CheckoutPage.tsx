@@ -93,6 +93,11 @@ const CheckoutPage = () => {
       return;
     }
 
+    // Check if special offer is active
+    if (cartState.hasSpecialOffer) {
+      toast.error('Cannot apply coupon when special offer (₹999 for 3+ items) is active');
+      return;
+    }
     setCouponLoading(true);
     try {
       const { data: coupons, error } = await supabase
@@ -131,8 +136,7 @@ const CheckoutPage = () => {
       }
 
       // Check minimum order amount
-      const orderTotal = cartState.hasSpecialOffer ? 999 : cartState.total;
-      if (orderTotal < coupon.min_order_amount) {
+      if (cartState.total < coupon.min_order_amount) {
         toast.error(`Minimum order amount of ₹${coupon.min_order_amount} required`);
         return;
       }

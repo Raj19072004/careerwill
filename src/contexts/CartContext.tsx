@@ -61,18 +61,29 @@ const calculateTotals = (state: CartState): CartState => {
   const total = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
   
-  // Special offer: Buy any 3 products for ₹999 (only if total > ₹999)
+  // Special offer: Buy any 3+ products for ₹999 (only if total > ₹999)
   let discountAmount = 0;
   let hasSpecialOffer = false;
+  let finalTotal = total;
+  let couponDiscount = 0;
   
   if (itemCount >= 3 && total > 999) {
     discountAmount = total - 999;
     hasSpecialOffer = true;
+    finalTotal = 999;
+  } else {
+    // Only apply coupon if special offer is not active
+    if (state.appliedCoupon) {
+      if (total >= state.appliedCoupon.min_order_amount) {
+        if (state.appliedCoupon.discount_type === 'percentage') {
+          couponDiscount = (total * state.appliedCoupon.discount_value) / 100;
+        } else {
+          couponDiscount = state.appliedCoupon.discount_value;
+        }
+        finalTotal = Math.max(0, total - couponDiscount);
+      }
+    }
   }
-  
-  // Apply coupon discount
-  let finalTotal = hasSpecialOffer ? 999 : total;
-  finalTotal = Math.max(0, finalTotal - (state.couponDiscount || 0));
   
   return { 
     ...state, 
@@ -80,7 +91,8 @@ const calculateTotals = (state: CartState): CartState => {
     itemCount, 
     discountAmount,
     finalTotal,
-    hasSpecialOffer
+    hasSpecialOffer,
+    couponDiscount
   };
 };
 
@@ -143,10 +155,18 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       return calculateTotals({ ...state, items: action.payload });
     
     case 'APPLY_COUPON':
+      // Don't allow coupon if special offer is active
+      const currentState = { ...state, appliedCoupon: action.payload.coupon };
+      const tempCalculated = calculateTotals(currentState);
+      
+      if (tempCalculated.hasSpecialOffer) {
+        return state; // Don't apply coupon if special offer is active
+      }
+      
       return calculateTotals({
         ...state,
         appliedCoupon: action.payload.coupon,
-        couponDiscount: action.payload.discount
+        couponDiscount: 0 // Will be calculated in calculateTotals
       });
     
     case 'REMOVE_COUPON':
@@ -249,7 +269,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newItemCount = state.itemCount + 1;
     const newTotal = state.total + item.price;
     
+    // Remove any applied coupon when special offer becomes active
     if (newItemCount === 3 && newTotal > 999) {
+      if (state.appliedCoupon) {
+        dispatch({ type: 'REMOVE_COUPON' });
+        toast.success(`Coupon removed - Special offer applied instead!`, {
+          duration: 3000,
+        });
+      }
       toast.success(`🎉 Special Offer Applied! Buy any 3 products for ₹999`, {
         duration: 5000,
         style: {
@@ -287,16 +314,26 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const applyCoupon = (coupon: Coupon) => {
-    let discount = 0;
-    const subtotal = state.hasSpecialOffer ? 999 : state.total;
+    // Check if special offer is already active
+    if (state.hasSpecialOffer) {
+      toast.error('Cannot apply coupon when special offer (₹999 for 3+ items) is active');
+      return;
+    }
     
+    // Check minimum order amount
+    if (state.total < coupon.min_order_amount) {
+      toast.error(`Minimum order amount of ₹${coupon.min_order_amount} required for this coupon`);
+      return;
+    }
+    
+    let discount = 0;
     if (coupon.discount_type === 'percentage') {
-      discount = (subtotal * coupon.discount_value) / 100;
+      discount = (state.total * coupon.discount_value) / 100;
     } else {
       discount = coupon.discount_value;
     }
     
-    dispatch({ type: 'APPLY_COUPON', payload: { coupon, discount } });
+    dispatch({ type: 'APPLY_COUPON', payload: { coupon, discount: 0 } });
     toast.success(`Coupon "${coupon.code}" applied! You saved ₹${discount.toFixed(2)}`);
   };
 
