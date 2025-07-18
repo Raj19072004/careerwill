@@ -7,7 +7,7 @@ import ProductDetail from '../components/ProductDetail';
 
 const ProductsPage = () => {
   const { products, loading } = useProducts();
-  const { addItem, isInCart } = useCart();
+  const { addItem, isInCart, state } = useCart();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
