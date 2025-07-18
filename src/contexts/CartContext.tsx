@@ -321,6 +321,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error('Invalid product data');
       return;
       if (triggersSpecialOffer) {
+      }
+    }
 
     dispatch({ type: 'ADD_ITEM', payload: item });
     
@@ -328,6 +330,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newItemCount = state.itemCount + 1;
     const newTotal = state.total + item.price;
         toast.success(`🎉 Special Offer Applied! First 3 products for ₹999`, {
+        }
+        )
     // Remove any applied coupon when special offer becomes active
     if (newItemCount === 3 && newTotal > 999) {
       if (state.appliedCoupon) {
