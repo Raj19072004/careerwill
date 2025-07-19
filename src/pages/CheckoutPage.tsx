@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile';
 import { supabase } from '../lib/supabase';
 import { ShoppingBag, CreditCard, MapPin, User, Tag, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -33,6 +34,7 @@ const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
   const { state: cartState, clearCart, applyCoupon, removeCoupon } = useCart();
   const { user } = useAuth();
+  const { profile } = useProfile();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
   const [couponCode, setCouponCode] = useState('');
@@ -51,6 +53,20 @@ const CheckoutPage: React.FC = () => {
       navigate('/products');
     }
   }, [cartState.items.length, navigate]);
+
+  // Load shipping address from profile when profile data is available
+  useEffect(() => {
+    if (profile) {
+      setShippingAddress({
+        fullName: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+        phone: profile.phone || '',
+        address: profile.address?.street || '',
+        city: profile.address?.city || '',
+        state: profile.address?.state || '',
+        pincode: profile.address?.pincode || '',
+      });
+    }
+  }, [profile]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
