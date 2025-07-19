@@ -32,6 +32,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Clear invalid tokens if session is null
+      if (!session) {
+        localStorage.removeItem('sb-hasimleqrjelypxhycsl-auth-token');
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setIsAdmin(session?.user?.user_metadata?.role === 'admin');
