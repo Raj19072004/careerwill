@@ -124,7 +124,7 @@ const calculateTotals = (state: CartState): CartState => {
     itemCount, 
     discountAmount,
     finalTotal,
-    hasSpecialOffer = true;
+    hasSpecialOffer,
     couponDiscount
   };
 };
