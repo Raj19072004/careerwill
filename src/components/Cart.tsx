@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, ShoppingBag, Trash2, Heart, ArrowRight, CreditCard, Sparkles, Gift, Tag } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useWishlist } from '../hooks/useWishlist';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -14,6 +15,7 @@ interface CartProps {
 const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
   const { state, updateQuantity, removeItem, clearCart } = useCart();
   const { user } = useAuth();
+  const { addToWishlist, isInWishlist } = useWishlist();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Debug cart state
@@ -42,6 +44,11 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
     // In a real app, this would integrate with a payment gateway like Razorpay
     toast.success('Redirecting to payment gateway...');
     handleCheckout();
+  };
+
+  const handleMoveToWishlist = async (item: any) => {
+    await addToWishlist(item.id);
+    removeItem(item.id);
   };
 
   return (
@@ -274,8 +281,19 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                             >
                               <Trash2 size={14} />
                             </button>
-                            <button className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors duration-200">
-                              <Heart size={14} />
+                            <button
+                              onClick={() => handleMoveToWishlist(item)}
+                              className={`p-1 rounded transition-colors duration-200 ${
+                                isInWishlist(item.id)
+                                  ? 'text-red-500 hover:bg-red-50'
+                                  : 'text-gray-500 hover:bg-gray-100'
+                              }`}
+                              title="Move to wishlist"
+                            >
+                              <Heart 
+                                size={14} 
+                                className={isInWishlist(item.id) ? 'fill-current' : ''} 
+                              />
                             </button>
                           </div>
                         </div>

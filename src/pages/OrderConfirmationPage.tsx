@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
-import { CheckCircle, Package, Truck, MapPin, Calendar, CreditCard, ArrowRight, Download, Share2 } from 'lucide-react';
+import { CheckCircle, Package, Truck, MapPin, Calendar, CreditCard, ArrowRight, Download, Share2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 interface Order {
   id: string;
@@ -23,6 +24,7 @@ const OrderConfirmationPage = () => {
   const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (orderId && user) {
@@ -45,6 +47,69 @@ const OrderConfirmationPage = () => {
       console.error('Error fetching order:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const canCancelOrder = (orderDate: string, status: string) => {
+    if (status === 'cancelled' || status === 'delivered') return false;
+    
+    const orderTime = new Date(orderDate).getTime();
+    const currentTime = new Date().getTime();
+    const timeDiff = currentTime - orderTime;
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+    return hoursDiff < 24;
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order || !user) return;
+    
+    if (!window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', order.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setOrder(prev => prev ? { ...prev, status: 'cancelled' } : null);
+      toast.success('Order cancelled successfully');
+    } catch (error) {
+      toast.error('Failed to cancel order');
+      console.error('Error cancelling order:', error);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!order) return;
+
+    const shareData = {
+      title: `Order Confirmation - Auresta`,
+      text: `My order #${order.id.slice(-8).toUpperCase()} has been confirmed! Total: ₹${order.total_amount.toFixed(2)}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Order link copied to clipboard!');
+      }
+    } catch (error) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Order link copied to clipboard!');
+      } catch (clipboardError) {
+        toast.error('Unable to share order');
+      }
     }
   };
 
@@ -141,9 +206,26 @@ const OrderConfirmationPage = () => {
               <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200">
                 <Download size={20} />
               </button>
-              <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200">
+              <button 
+                onClick={handleShare}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              >
                 <Share2 size={20} />
               </button>
+              {canCancelOrder(order.created_at, order.status) && (
+                <button
+                  onClick={handleCancelOrder}
+                  disabled={cancelling}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-inter font-medium text-sm transition-colors duration-200 disabled:opacity-50"
+                >
+                  {cancelling ? (
+                    <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <X size={16} />
+                  )}
+                  Cancel Order
+                </button>
+              )}
             </div>
           </div>
 
@@ -152,6 +234,23 @@ const OrderConfirmationPage = () => {
             <h3 className="text-lg font-playfair font-semibold text-gray-800 mb-4">
               Order Status
             </h3>
+            
+            {order.status === 'cancelled' && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 font-inter font-medium">
+                  ❌ This order has been cancelled
+                </p>
+              </div>
+            )}
+            
+            {canCancelOrder(order.created_at, order.status) && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-800 font-inter font-medium">
+                  ⏰ You can cancel this order within 24 hours of placing it
+                </p>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between">
               {getStatusSteps().map((step, index) => (
                 <React.Fragment key={step.id}>

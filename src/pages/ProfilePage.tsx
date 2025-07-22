@@ -3,12 +3,16 @@ import { motion } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, Camera, Heart, Package, Settings, LogOut, Eye, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
+import { useWishlist } from '../hooks/useWishlist';
+import { useCart } from '../contexts/CartContext';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 
 const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const { profile, updateProfile } = useProfile();
+  const { wishlistItems, loading: wishlistLoading, removeFromWishlist } = useWishlist();
+  const { addItem } = useCart();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [profileData, setProfileData] = useState({
@@ -134,6 +138,67 @@ const ProfilePage = () => {
         ? prev.skinConcerns.filter(c => c !== concern)
         : [...prev.skinConcerns, concern]
     }));
+  };
+
+  const handleMoveToCart = async (item: any) => {
+    addItem({
+      id: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      image_url: item.product.image_url,
+      category: item.product.category
+    });
+    await removeFromWishlist(item.product_id);
+  };
+
+  const canCancelOrder = (orderDate: string) => {
+    const orderTime = new Date(orderDate).getTime();
+    const currentTime = new Date().getTime();
+    const timeDiff = currentTime - orderTime;
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+    return hoursDiff < 24;
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', orderId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      toast.success('Order cancelled successfully');
+      // Refresh orders
+      if (activeTab === 'orders') {
+        const fetchOrders = async () => {
+          if (!user) return;
+          setOrdersLoading(true);
+          try {
+            const { data, error } = await supabase
+              .from('orders')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            setOrders(data || []);
+          } catch (err) {
+            console.error('Error fetching orders:', err);
+            setOrdersError(err instanceof Error ? err.message : 'Failed to fetch orders');
+          } finally {
+            setOrdersLoading(false);
+          }
+        };
+        fetchOrders();
+      }
+    } catch (error) {
+      toast.error('Failed to cancel order');
+      console.error('Error cancelling order:', error);
+    }
   };
 
   return (
@@ -585,13 +650,31 @@ const ProfilePage = () => {
                           
                           {/* Action Button */}
                           <div className="border-t border-gray-100 pt-4 mt-4">
-                            <a
-                              href={`/order-confirmation/${order.id}`}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-lg font-inter font-medium text-sm transition-colors duration-200"
-                            >
-                              <Eye size={16} />
-                              View Details
-                            </a>
+                            <div className="flex gap-2">
+                              <a
+                                href={`/order-confirmation/${order.id}`}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-lg font-inter font-medium text-sm transition-colors duration-200"
+                              >
+                                <Eye size={16} />
+                                View Details
+                              </a>
+                              
+                              {canCancelOrder(order.created_at) && order.status !== 'cancelled' && order.status !== 'delivered' && (
+                                <button
+                                  onClick={() => handleCancelOrder(order.id)}
+                                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-inter font-medium text-sm transition-colors duration-200"
+                                >
+                                  <X size={16} />
+                                  Cancel Order
+                                </button>
+                              )}
+                            </div>
+                            
+                            {canCancelOrder(order.created_at) && order.status !== 'cancelled' && order.status !== 'delivered' && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                You can cancel this order within 24 hours of placing it
+                              </p>
+                            )}
                           </div>
                         </motion.div>
                       ))}
@@ -606,15 +689,103 @@ const ProfilePage = () => {
                   <h1 className="text-3xl font-playfair font-bold text-gray-800 mb-8">
                     Wishlist
                   </h1>
-                  <div className="text-center py-12">
-                    <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-playfair font-semibold text-gray-800 mb-2">
-                      Your Wishlist is Empty
-                    </h3>
-                    <p className="text-gray-600 font-inter">
-                      Save your favorite products here for easy access later.
-                    </p>
-                  </div>
+                  
+                  {wishlistLoading ? (
+                    <div className="text-center py-12">
+                      <div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-gray-600 font-inter">Loading your wishlist...</p>
+                    </div>
+                  ) : wishlistItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-playfair font-semibold text-gray-800 mb-2">
+                        Your Wishlist is Empty
+                      </h3>
+                      <p className="text-gray-600 font-inter mb-6">
+                        Save your favorite products here for easy access later.
+                      </p>
+                      <a
+                        href="/products"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl font-inter font-medium hover:shadow-lg transition-all duration-300"
+                      >
+                        Browse Products
+                        <ArrowRight size={18} />
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {wishlistItems.map((item, index) => (
+                        <motion.div
+                          key={item.id}
+                          className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.1 }}
+                        >
+                          <div className="relative h-48">
+                            <img
+                              src={item.product.image_url || "https://images.pexels.com/photos/7755515/pexels-photo-7755515.jpeg"}
+                              alt={item.product.name}
+                              className="w-full h-full object-cover"
+                            />
+                            {!item.product.is_available && (
+                              <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-inter font-medium">
+                                Coming Soon
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="p-4">
+                            <h3 className="text-lg font-playfair font-semibold text-gray-800 mb-2">
+                              {item.product.name}
+                            </h3>
+                            <p className="text-gray-600 font-inter text-sm mb-3 line-clamp-2">
+                              {item.product.description}
+                            </p>
+                            
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="text-xl font-playfair font-bold text-primary-600">
+                                ₹{item.product.price}
+                              </span>
+                              <span className="text-sm text-gray-500 font-inter capitalize">
+                                {item.product.category?.replace('-', ' ')}
+                              </span>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              {item.product.is_available ? (
+                                <button
+                                  onClick={() => handleMoveToCart(item)}
+                                  className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 text-white py-2 px-4 rounded-xl font-inter font-medium hover:shadow-lg transition-all duration-300"
+                                >
+                                  Add to Cart
+                                </button>
+                              ) : (
+                                <button
+                                  disabled
+                                  className="flex-1 bg-gray-300 text-gray-500 py-2 px-4 rounded-xl font-inter font-medium cursor-not-allowed"
+                                >
+                                  Coming Soon
+                                </button>
+                              )}
+                              
+                              <button
+                                onClick={() => removeFromWishlist(item.product_id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors duration-200"
+                                title="Remove from wishlist"
+                              >
+                                <Heart size={20} className="fill-current" />
+                              </button>
+                            </div>
+                            
+                            <p className="text-xs text-gray-500 font-inter mt-3">
+                              Added {new Date(item.created_at).toLocaleDateString('en-IN')}
+                            </p>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
