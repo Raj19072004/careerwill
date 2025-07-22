@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Leaf, Star, ArrowRight, Sparkles, Droplets, Filter, Grid, List, ShoppingCart, Eye } from 'lucide-react';
+import { Clock, Leaf, Star, ArrowRight, Sparkles, Droplets, Filter, Grid, List, ShoppingCart, Eye, Heart, Share2 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../hooks/useWishlist';
 import ProductDetail from '../components/ProductDetail';
 
 const ProductsPage = () => {
   const { products, loading } = useProducts();
   const { addItem, isInCart, state } = useCart();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -108,6 +110,38 @@ const ProductsPage = () => {
       category: product.category
     });
     console.log('Cart state after adding:', state);
+  };
+
+  const handleWishlistToggle = async (product: any) => {
+    if (isInWishlist(product.id)) {
+      await removeFromWishlist(product.id);
+    } else {
+      await addToWishlist(product.id);
+    }
+  };
+
+  const handleShare = async (product: any) => {
+    const shareData = {
+      title: product.name,
+      text: `Check out this amazing product: ${product.name} - ${product.description}`,
+      url: `${window.location.origin}/products?product=${product.id}`,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareData.url);
+        toast.success('Product link copied to clipboard!');
+      }
+    } catch (error) {
+      try {
+        await navigator.clipboard.writeText(shareData.url);
+        toast.success('Product link copied to clipboard!');
+      } catch (clipboardError) {
+        toast.error('Unable to share product');
+      }
+    }
   };
 
   const handleProductClick = (product: any) => {
@@ -370,9 +404,38 @@ const ProductsPage = () => {
                         <h3 className="text-2xl font-playfair font-bold text-gray-800 group-hover:text-primary-600 transition-colors duration-300">
                           {product.name}
                         </h3>
-                        <span className="text-3xl font-playfair font-bold text-primary-600">
-                          ₹{product.price}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-3xl font-playfair font-bold text-primary-600">
+                            ₹{product.price}
+                          </span>
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleWishlistToggle(product);
+                              }}
+                              className={`p-1 rounded transition-colors duration-200 ${
+                                isInWishlist(product.id)
+                                  ? 'text-red-500 hover:bg-red-50'
+                                  : 'text-gray-500 hover:bg-gray-100'
+                              }`}
+                            >
+                              <Heart 
+                                size={14} 
+                                className={isInWishlist(product.id) ? 'fill-current' : ''} 
+                              />
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShare(product);
+                              }}
+                              className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors duration-200"
+                            >
+                              <Share2 size={14} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
                       <p className="text-gray-600 font-inter mb-6 leading-relaxed">
