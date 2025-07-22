@@ -39,28 +39,71 @@ const OrderManagement = () => {
 
       if (ordersError) throw ordersError;
 
-      // Get user details for each order
+      // Get user details for each order using auth.users
       const userIds = [...new Set(ordersData?.map(order => order.user_id).filter(Boolean))];
       
       let userProfiles: any[] = [];
+      let authUsers: any[] = [];
+      
       if (userIds.length > 0) {
+        // Get user profiles
         const { data: profilesData } = await supabase
           .from('user_profiles')
           .select('id, first_name, last_name')
           .in('id', userIds);
 
         userProfiles = profilesData || [];
+
+        // Get auth user data via edge function
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session) {
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (response.ok) {
+              const userData = await response.json();
+              authUsers = userData.users || [];
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching auth users:', error);
+        }
       }
 
       // Combine orders with user data
       const ordersWithUsers = ordersData?.map(order => {
         const userProfile = userProfiles.find(profile => profile.id === order.user_id);
+        const authUser = authUsers.find(user => user.id === order.user_id);
+        
+        // Try to get name from profile first, then auth user, then shipping address
+        let userName = 'Unknown User';
+        let userEmail = 'No email';
+        
+        if (userProfile && (userProfile.first_name || userProfile.last_name)) {
+          userName = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim();
+        } else if (authUser && (authUser.first_name || authUser.last_name)) {
+          userName = `${authUser.first_name || ''} ${authUser.last_name || ''}`.trim();
+        } else if (order.shipping_address?.fullName) {
+          userName = order.shipping_address.fullName;
+        }
+        
+        if (authUser?.email) {
+          userEmail = authUser.email;
+        } else if (order.shipping_address?.email) {
+          userEmail = order.shipping_address.email;
+        }
+        
         return {
           ...order,
-          user_name: userProfile 
-            ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Unknown User'
-            : 'Unknown User',
-          user_email: order.shipping_address?.email || 'No email'
+          user_name: userName,
+          user_email: userEmail
         };
       }) || [];
 
@@ -260,9 +303,9 @@ const OrderManagement = () => {
                   <td className="py-4 px-4">
                     <div>
                       <p className="font-inter font-medium text-gray-800">
-                        {order.user_name}
+                        {order.user_name || 'Unknown User'}
                       </p>
-                      <p className="text-sm text-gray-600">{order.user_email}</p>
+                      <p className="text-sm text-gray-600">{order.user_email || 'No email'}</p>
                     </div>
                   </td>
                   <td className="py-4 px-4">
@@ -428,11 +471,11 @@ const OrderManagement = () => {
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <User className="w-4 h-4 text-gray-400" />
-                        <span>{selectedOrder.user_name}</span>
+                        <span>{selectedOrder.user_name || 'Unknown User'}</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Mail className="w-4 h-4 text-gray-400" />
-                        <span>{selectedOrder.user_email}</span>
+                        <span>{selectedOrder.user_email || 'No email'}</span>
                       </div>
                       {selectedOrder.shipping_address?.phone && (
                         <div className="flex items-center gap-3">
@@ -453,12 +496,17 @@ const OrderManagement = () => {
                         <MapPin className="w-4 h-4 text-gray-400 mt-1" />
                         <div>
                           <p className="font-medium">
-                            {selectedOrder.shipping_address?.firstName} {selectedOrder.shipping_address?.lastName}
+                            {selectedOrder.shipping_address?.fullName || 
+                             `${selectedOrder.shipping_address?.firstName || ''} ${selectedOrder.shipping_address?.lastName || ''}`.trim() ||
+                             'No name provided'}
                           </p>
                           <p className="text-gray-600">{selectedOrder.shipping_address?.address}</p>
                           <p className="text-gray-600">
                             {selectedOrder.shipping_address?.city}, {selectedOrder.shipping_address?.state} {selectedOrder.shipping_address?.pincode}
                           </p>
+                          {selectedOrder.shipping_address?.phone && (
+                            <p className="text-gray-600">{selectedOrder.shipping_address.phone}</p>
+                          )}
                         </div>
                       </div>
                     </div>
