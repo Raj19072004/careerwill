@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Plus, Minus, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useWishlist } from '../hooks/useWishlist';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -46,6 +47,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, isOpen, onClose 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { addItem, isInCart } = useCart();
   const { user } = useAuth();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
   const productImages = product.images && product.images.length > 0 
     ? product.images 
@@ -158,6 +160,45 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, isOpen, onClose 
         image_url: productImages[0],
         category: product.category
       });
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!user) {
+      toast.error('Please sign in to add items to wishlist');
+      return;
+    }
+
+    if (isInWishlist(product.id)) {
+      await removeFromWishlist(product.id);
+    } else {
+      await addToWishlist(product.id);
+    }
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: product.name,
+      text: `Check out this amazing product: ${product.name} - ${product.description}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback to copying URL to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Product link copied to clipboard!');
+      }
+    } catch (error) {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Product link copied to clipboard!');
+      } catch (clipboardError) {
+        toast.error('Unable to share product');
+      }
     }
   };
 
@@ -390,10 +431,23 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, isOpen, onClose 
                               <ShoppingCart size={20} />
                               {isInCart(product.id) ? 'Add More to Cart' : 'Add to Cart'}
                             </motion.button>
-                            <button className="p-4 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors duration-200">
-                              <Heart size={20} />
+                            <button 
+                              onClick={handleWishlistToggle}
+                              className={`p-4 border rounded-xl transition-colors duration-200 ${
+                                isInWishlist(product.id)
+                                  ? 'border-red-300 bg-red-50 text-red-600 hover:bg-red-100'
+                                  : 'border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <Heart 
+                                size={20} 
+                                className={isInWishlist(product.id) ? 'fill-current' : ''} 
+                              />
                             </button>
-                            <button className="p-4 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors duration-200">
+                            <button 
+                              onClick={handleShare}
+                              className="p-4 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors duration-200"
+                            >
                               <Share2 size={20} />
                             </button>
                           </div>
